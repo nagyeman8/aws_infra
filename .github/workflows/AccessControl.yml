@@ -1,0 +1,69 @@
+name: Project_Name AccessControl Terraform
+run-name: Terraform AccessControl - ${{ github.event.inputs.environment || 'Project_Name-ENV' }}
+on:
+  push:
+    branches:
+      - 'feature/*'
+      - 'main'
+    paths:
+      - 'terraform/**' 
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: environment
+        description: Select the environment
+        default: Project_Name-ENV
+      plan:
+        type: boolean
+        description: 'Check to plan, uncheck to skip'
+        default: true
+      deploy:
+        type: boolean
+        description: 'Check to deploy, uncheck to skip'
+        default: false   
+jobs:
+  AccessControl:
+    name: ${{ github.event.inputs.environment || 'Project_Name-ENV' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'Project_Name-ENV' }}
+    env:
+      TERRAFORM_DIR: terraform/env/${{ github.event.inputs.environment || 'Project_Name-ENV' }}/iam/
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '14'
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: '${{ secrets.TF_USER_AWS_KEY }}'
+          aws-secret-access-key: '${{ secrets.TF_USER_AWS_SECRET }}'
+          aws-region: region
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.8.2"
+      - name: Project_Name Terraform Infrastructure
+        id: file_path
+        run: |
+          terraform fmt -recursive
+          cd ${{ env.TERRAFORM_DIR }}
+          terraform --version
+      - name: Terraform Init and Validate
+        id: Init
+        run: |
+          cd ${{ env.TERRAFORM_DIR }}
+          terraform init
+          terraform validate
+      - name: Terraform Plan
+        id: Plan
+        if: ${{ github.event.inputs.plan == 'true' || 'true' }}
+        run: |
+          cd ${{ env.TERRAFORM_DIR }}
+          terraform plan
+      - name: Terraform Deploy
+        id: deploy
+        if: ${{ github.event.inputs.deploy == 'true' }}
+        run: |
+          cd ${{ env.TERRAFORM_DIR }}
+          terraform apply --auto-approve
